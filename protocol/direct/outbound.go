@@ -78,23 +78,15 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 	return outbound, nil
 }
 
-func (h *Outbound) Start(stage adapter.StartStage) error {
-	switch stage {
-	case adapter.StartStatePostStart, adapter.StartStateStarted:
-		h.fetchMyAddresses()
-	}
-	return nil
-}
-
-func (h *Outbound) fetchMyAddresses() {
-	if len(h.myAddresses.Load()) > 0 {
-		return
+func (h *Outbound) fetchMyAddresses() []netip.Prefix {
+	myAddresses := h.myAddresses.Load()
+	if len(myAddresses) > 0 {
+		return myAddresses
 	}
 	myInterfaceNames := h.network.InterfaceMonitor().MyInterfaces()
 	if len(myInterfaceNames) == 0 {
-		return
+		return nil
 	}
-	var myAddresses []netip.Prefix
 	for _, myInterfaceName := range myInterfaceNames {
 		myInterface, err := h.network.InterfaceFinder().ByName(myInterfaceName)
 		if err != nil {
@@ -102,11 +94,14 @@ func (h *Outbound) fetchMyAddresses() {
 		}
 		myAddresses = append(myAddresses, myInterface.Addresses...)
 	}
-	h.myAddresses.Store(myAddresses)
+	if len(myAddresses) > 0 {
+		h.myAddresses.Store(myAddresses)
+	}
+	return myAddresses
 }
 
 func (h *Outbound) isMyLoopbackAddress(addresses ...netip.Addr) bool {
-	for _, prefix := range h.myAddresses.Load() {
+	for _, prefix := range h.fetchMyAddresses() {
 		for _, address := range addresses {
 			if prefix.Addr() != address && prefix.Contains(address) {
 				return true
