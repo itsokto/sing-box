@@ -103,7 +103,10 @@ func (h *Outbound) fetchMyAddresses() []netip.Prefix {
 func (h *Outbound) isMyLoopbackAddress(addresses ...netip.Addr) bool {
 	for _, prefix := range h.fetchMyAddresses() {
 		for _, address := range addresses {
-			if prefix.Addr() != address && prefix.Contains(address) {
+			if !C.IsDarwin && prefix.Addr() == address {
+				continue
+			}
+			if prefix.Contains(address) {
 				return true
 			}
 		}
